@@ -4,10 +4,15 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+
 
 export default function RootLayout({ children }) {
   const [user, setUser] = useState(null)
   const pathname = usePathname()
+  const [query, setQuery] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     const getUser = async () => {
@@ -54,9 +59,63 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className="bg-white text-black font-sans">
 
+      {/* Top Bar */}
+      <div className="w-full border-b border-gray-300 bg-white sticky top-0 z-50">
+      <div className="relative h-16 w-full flex items-center bg-white sticky top-0 z-50">
+        {/* Left-aligned Fizzbuzz logo */}
+        <div className="pl-6">
+          <h1 className="text-2xl font-bold text-blue-500">Fizzbuzz</h1>
+        </div>
+
+        {/* Absolutely centered Search Bar */}
+        <div className="absolute left-1/2 transform -translate-x-1/2 w-full max-w-md">
+        <input
+          type="text"
+          value={query}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 200)} // slight delay so buttons can be clicked
+          onChange={(e) => {
+            setQuery(e.target.value)
+            setShowDropdown(true)
+          }}
+          placeholder="Search users or posts..."
+          className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+        />
+
+
+        {showDropdown && (
+          <div className="absolute top-full left-0 w-full mt-2 bg-white border border-gray-300 rounded shadow z-50">
+            <button
+              onClick={() => {
+                router.push(`/search/users?q=${encodeURIComponent(query)}`)
+                setShowDropdown(false)
+              }}
+              className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+            >
+              🔍 Search users for "{query || '...'}"
+            </button>
+            <button
+              onClick={() => {
+                router.push(`/search/posts?q=${encodeURIComponent(query)}`)
+                setShowDropdown(false)
+              }}
+              className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+            >
+              📝 Search posts for "{query || '...'}"
+            </button>
+          </div>
+        )}
+
+        </div>
+      </div>
+
+      </div>
+
+
+
+
         {/* Fixed Sidebar on Far Left */}
-        <aside className="fixed left-0 top-0 h-screen w-64 p-4 border-r border-gray-300 bg-white z-10">
-          <h1 className="text-2xl font-bold text-blue-500 mb-6">Fizzbuzz</h1>
+        <aside className="fixed left-0 top-0 h-screen w-64 pt-16 p-4 border-r border-gray-300 bg-white z-10">
 
           <div className="flex flex-col space-y-6 mt-4">
             <Link href="/">
@@ -67,7 +126,7 @@ export default function RootLayout({ children }) {
 
             {user && (
               <Link href={`/user/${user.user_metadata.user_name}`}>
-                <button className={`w-full text-left py-2 px-3 rounded-md hover:bg-blue-100 transition ${pathname.includes('/user') ? 'bg-blue-200 font-semibold' : ''}`}>
+                <button className={`w-full text-left py-2 px-3 rounded-md hover:bg-blue-100 transition ${pathname.includes('/user/') ? 'bg-blue-200 font-semibold' : ''}`}>
                   My Profile
                 </button>
               </Link>

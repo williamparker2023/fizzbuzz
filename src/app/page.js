@@ -177,6 +177,7 @@ export default function Home() {
   return (
     <div className="flex min-h-screen justify-center">
       {/* Main Content */}
+
       <main className="w-full max-w-2xl px-4">
         {/* New Buzz Form at the top */}
         {user && (
@@ -186,7 +187,7 @@ export default function Home() {
           >
             <textarea
               name="newBuzz"
-              placeholder="What's on your mind?"
+              placeholder="What's buzzing?"
               className="w-full p-3 rounded bg-white text-black  resize-none focus:outline-none focus:ring-2 focus:ring-darkaccent"
               rows={3}
             />
