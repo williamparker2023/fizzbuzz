@@ -300,6 +300,16 @@ export default function UserProfile() {
 
                 {isOpen && (
                   <div className="pt-4 space-y-4 animate-fade-in">
+                    {currentUser && (
+                      <form onSubmit={e => handleNewComment(e, buzz.id)} className="flex gap-2">
+                        <input
+                          name="comment"
+                          placeholder="Reply..."
+                          className="flex-1 p-2 text-sm border border-gray-300 rounded text-black"
+                        />
+                        <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">Send</button>
+                      </form>
+                    )}
                     {buzz.comments.map(comment => (
                       <div key={comment.id} className="text-sm text-black">
                         <div className="flex items-center gap-2 mb-1">
@@ -322,16 +332,7 @@ export default function UserProfile() {
                       </div>
                     ))}
 
-                    {currentUser && (
-                      <form onSubmit={e => handleNewComment(e, buzz.id)} className="flex gap-2">
-                        <input
-                          name="comment"
-                          placeholder="Reply..."
-                          className="flex-1 p-2 text-sm border border-gray-300 rounded text-black"
-                        />
-                        <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">Send</button>
-                      </form>
-                    )}
+
                   </div>
                 )}
               </div>

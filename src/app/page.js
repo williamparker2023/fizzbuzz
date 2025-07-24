@@ -311,20 +311,6 @@ export default function Home() {
 
               {isOpen && (
                 <div className="pt-4 space-y-4 animate-fade-in">
-                  {buzz.comments.map(comment => (
-                    <div key={comment.id} className="text-sm text-black">
-                      <div className="flex items-center gap-2 mb-1">
-                        {comment.users?.username ? (
-                          <a href={`/user/${comment.users.username}`} className="text-blue-600 hover:underline">
-                            {comment.users.username}
-                          </a>
-                        ) : <span className="text-gray-500">anonymous</span>}
-                        <span className="text-gray-500 text-xs">• {new Date(comment.created_at).toLocaleString()}</span>
-                      </div>
-                      <div className="ml-1">💬 {comment.content}</div>
-                    </div>
-                  ))}
-
                   {user && (
                     <form
                       onSubmit={e => handleCommentSubmit(e, buzz.id)}
@@ -339,6 +325,21 @@ export default function Home() {
 
                     </form>
                   )}
+                  {buzz.comments.map(comment => (
+                    <div key={comment.id} className="text-sm text-black">
+                      <div className="flex items-center gap-2 mb-1">
+                        {comment.users?.username ? (
+                          <a href={`/user/${comment.users.username}`} className="text-blue-600 hover:underline">
+                            {comment.users.username}
+                          </a>
+                        ) : <span className="text-gray-500">anonymous</span>}
+                        <span className="text-gray-500 text-xs">• {new Date(comment.created_at).toLocaleString()}</span>
+                      </div>
+                      <div className="ml-1">💬 {comment.content}</div>
+                    </div>
+                  ))}
+
+
                 </div>
               )}
             </div>
