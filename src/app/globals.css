@@ -9,3 +9,12 @@ body {
 a {
   @apply text-blue-600 hover:underline;
 }
+
+/* Tailwind-compatible way to hide scrollbar */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;     /* Firefox */
+}

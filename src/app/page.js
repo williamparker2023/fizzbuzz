@@ -9,6 +9,7 @@ export default function Home() {
   const [buzzes, setBuzzes] = useState([])
   const router = useRouter()
   const [previewUrl, setPreviewUrl] = useState(null)
+  const [sortMode, setSortMode] = useState('trending') 
 
 
   function transformBuzzes(data, user) {
@@ -20,11 +21,12 @@ export default function Home() {
 
       return {
         ...buzz,
-        likeCount: likes.length,
+        likeCount: Number(buzz.like_count) || 0,
         likedByUser: user ? likes.some(like => like.user_id === user.id) : false
       }
     })
   }
+
 
   useEffect(() => {
     const getUser = async () => {
@@ -34,11 +36,11 @@ export default function Home() {
     getUser()
   }, [])
 
-  const loadBuzzes = async () => {
-    const { data, error } = await supabase
+  const loadBuzzes = async (mode = 'trending') => {
+    let query = supabase
       .from('buzzes')
       .select(`
-        id, content, created_at, tags, image_url,
+        id, content, created_at, tags, image_url, like_count,
         users (username, github_url),
         likes:likes (user_id),
         comments (
@@ -46,14 +48,31 @@ export default function Home() {
           users (username, github_url)
         )
       `)
-      .order('created_at', { ascending: false })
 
-    if (!error) setBuzzes(transformBuzzes(data, user))
+    query = mode === 'recent'
+      ? query.order('created_at', { ascending: false })
+      : query.order('like_count', { ascending: false })
+
+    const { data, error } = await query
+
+    if (!error) {
+      const transformed = transformBuzzes(data, user)
+      setBuzzes(transformed)
+      console.log('Buzzes after reload:', transformed.map(b => ({
+        id: b.id,
+        likeCount: b.likeCount,
+        like_count: b.like_count
+      })))
+    }
   }
 
+
+
+
   useEffect(() => {
-    if (user) loadBuzzes()
-  }, [user])
+    if (user) loadBuzzes(sortMode)
+  }, [user, sortMode])
+
 
 
   const handleLikeToggle = async (buzzId) => {
@@ -66,28 +85,45 @@ export default function Home() {
     const buzz = buzzes.find(b => b.id === buzzId)
     const hasLiked = buzz.likedByUser
 
+    let error
+
     if (hasLiked) {
-      await supabase.from('likes').delete().eq('buzz_id', buzzId).eq('user_id', user.id)
+      const res = await supabase
+        .from('likes')
+        .delete()
+        .eq('buzz_id', buzzId)
+        .eq('user_id', user.id)
+
+      error = res.error
     } else {
-      const { error } = await supabase.from('likes').insert({ buzz_id: buzzId, user_id: user.id })
-      if (error && !error.message.includes('duplicate key')) console.error(error)
+      const res = await supabase
+        .from('likes')
+        .insert({ buzz_id: buzzId, user_id: user.id })
+
+      error = res.error
     }
 
-    const { data, error } = await supabase
-      .from('buzzes')
-      .select(`
-        id, content, created_at, tags, image_url,
-        users (username, github_url),
-        likes:likes (user_id),
-        comments (
-          id, content, created_at, user_id,
-          users (username, github_url)
-        )
-      `)
-      .order('created_at', { ascending: false })
+    if (error && !error.message.includes('duplicate key')) {
+      console.error('Like toggle error:', error)
+      return
+    }
 
-    if (!error) setBuzzes(transformBuzzes(data, user))
+    // ✅ Update the local buzz object to avoid reshuffling
+    setBuzzes(prevBuzzes =>
+      prevBuzzes.map(b =>
+        b.id === buzzId
+          ? {
+              ...b,
+              likedByUser: !hasLiked,
+              likeCount: hasLiked ? b.likeCount - 1 : b.likeCount + 1
+            }
+          : b
+      )
+    )
   }
+
+
+
 
   const handleNewBuzzSubmit = async (e) => {
     e.preventDefault()
@@ -247,6 +283,38 @@ export default function Home() {
 
           </form>
         )}
+
+        <div className="flex mt-4 border-b border-gray-300 pb-2">
+          {/* Left Half - Trending */}
+          <div className="w-1/2 flex justify-center">
+            <button
+              onClick={() => setSortMode('trending')}
+              className={`pb-1 border-b-2 ${
+                sortMode === 'trending'
+                  ? 'border-blue-600 text-blue-600 font-semibold'
+                  : 'border-transparent text-gray-500'
+              }`}
+            >
+              Trending
+            </button>
+          </div>
+
+          {/* Right Half - Recent */}
+          <div className="w-1/2 flex justify-center">
+            <button
+              onClick={() => setSortMode('recent')}
+              className={`pb-1 border-b-2 ${
+                sortMode === 'recent'
+                  ? 'border-blue-600 text-blue-600 font-semibold'
+                  : 'border-transparent text-gray-500'
+              }`}
+            >
+              Recent
+            </button>
+          </div>
+        </div>
+
+
 
         {/* Feed Header */}
         {/* <div className="flex justify-between items-center mb-6 animate-fadeIn">

@@ -222,6 +222,7 @@ export default function UserProfile() {
 
 
               {currentUser?.id !== profile.id && (
+              <>
                 <button
                   onClick={handleFollowToggle}
                   className={`ml-4 px-3 py-1 text-sm rounded ${
@@ -230,6 +231,13 @@ export default function UserProfile() {
                 >
                   {isFollowing ? 'Unfollow' : 'Follow'}
                 </button>
+                <Link
+                  href={`/messages/new?to=${profile.username}`}
+                  className="ml-2 px-3 py-1 text-sm rounded bg-gray-100 hover:bg-gray-200"
+                >
+                  💬 Message
+                </Link>
+              </>
               )}
             </div>
           </div>
