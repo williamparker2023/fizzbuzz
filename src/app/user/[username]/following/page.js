@@ -58,7 +58,7 @@ export default function FollowingPage() {
 
       {following.length === 0 ? (
         <p className="text-gray-500 text-center py-8">
-          This user isn't following anyone yet.
+          This user isn&rsquo;t following anyone yet.
         </p>
       ) : (
         following.map(user => (

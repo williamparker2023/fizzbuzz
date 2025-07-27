@@ -1,28 +1,43 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 export default function ConversationPage() {
-  const { id: otherUsername } = useParams()
+  const { id: conversationId } = useParams()
   const [messages, setMessages] = useState([])
   const [messageText, setMessageText] = useState('')
   const [currentUser, setCurrentUser] = useState(null)
-  const [otherUserId, setOtherUserId] = useState(null)
   const [otherUser, setOtherUser] = useState(null)
   const messagesEndRef = useRef(null)
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user }, error: userFetchError } = await supabase.auth.getUser()
-      if (userFetchError || !user) return
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
       setCurrentUser(user)
 
-      // Fetch other user (username → ID + username)
+      // Get conversation
+      const { data: convo, error: convoError } = await supabase
+        .from('messages')
+        .select('id, sender_id, receiver_id')
+        .eq('id', conversationId)
+        .single()
+
+      if (convoError || !convo) {
+        console.error('Failed to load conversation:', convoError)
+        return
+      }
+
+      const otherUserId = convo.sender_id === user.id
+        ? convo.receiver_id
+        : convo.sender_id
+
+      // Get other user
       const { data: otherUserData, error: otherUserError } = await supabase
         .from('users')
         .select('id, username, github_url')
-        .eq('username', otherUsername)
+        .eq('id', otherUserId)
         .single()
 
       if (otherUserError || !otherUserData) {
@@ -30,54 +45,48 @@ export default function ConversationPage() {
         return
       }
 
-      setOtherUserId(otherUserData.id)
       setOtherUser(otherUserData)
 
-      // Load messages between currentUser and other user
+      // Load all messages between these two users
       const { data: messageData, error: messageError } = await supabase
         .from('messages')
         .select('id, sender_id, receiver_id, content, created_at')
-        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserData.id}),and(sender_id.eq.${otherUserData.id},receiver_id.eq.${user.id})`)
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`)
         .order('created_at')
 
       if (messageError) {
-        console.error('Failed to load messages:', JSON.stringify(messageError, null, 2))
+        console.error('Failed to load messages:', messageError)
       } else {
         setMessages(messageData)
       }
     }
 
     load()
-  }, [otherUsername])
+  }, [conversationId])
 
-    useEffect(() => {
-    if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
-    }
-    }, [messages])
-
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   const sendMessage = async (e) => {
     e.preventDefault()
-
     const content = messageText.trim()
-    if (!content || !currentUser || !otherUserId) return
+    if (!content || !currentUser || !otherUser) return
 
     const { error } = await supabase.from('messages').insert({
       sender_id: currentUser.id,
-      receiver_id: otherUserId,
+      receiver_id: otherUser.id,
       content,
     })
 
     if (error) {
-      console.error("Failed to insert message:", JSON.stringify(error, null, 2))
+      console.error("Failed to insert message:", error)
     } else {
       setMessageText('')
-      // Refresh messages
       const { data: newMessages, error: reloadError } = await supabase
         .from('messages')
         .select('id, sender_id, receiver_id, content, created_at')
-        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${currentUser.id})`)
+        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${otherUser.id}),and(sender_id.eq.${otherUser.id},receiver_id.eq.${currentUser.id})`)
         .order('created_at')
 
       if (!reloadError) setMessages(newMessages)
@@ -87,22 +96,21 @@ export default function ConversationPage() {
 
   return (
     <main className="p-6 max-w-2xl mx-auto text-black">
-        <div className="flex items-center gap-4 mb-4">
+      <div className="flex items-center gap-4 mb-4">
         {otherUser?.github_url && (
-            <img
-            src={otherUser?.github_url}
-            alt={`${otherUser?.username}'s avatar`}
+          <img
+            src={otherUser.github_url}
+            alt={`${otherUser.username}'s avatar`}
             className="w-10 h-10 rounded-full object-cover"
-            />
+          />
         )}
         <a
-            href={`/profile/${otherUser?.username}`}
-            className="text-lg font-semibold text-blue-600 hover:underline"
+          href={`/user/${otherUser?.username}`}
+          className="text-lg font-semibold text-blue-600 hover:underline"
         >
-            @{otherUser?.username || '...'}
+          @{otherUser?.username || '...'}
         </a>
-        </div>
-
+      </div>
 
       <div className="p-4 h-[60vh] overflow-y-scroll bg-white mb-4 scrollbar-hide">
         {messages.map(msg => (
@@ -115,7 +123,6 @@ export default function ConversationPage() {
             }`}
           >
             <p className="text-sm break-words whitespace-pre-wrap">{msg.content}</p>
-
             <p className="text-xs text-gray-500 mt-1">
               {new Date(msg.created_at).toLocaleTimeString()}
             </p>

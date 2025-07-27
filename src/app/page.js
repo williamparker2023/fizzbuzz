@@ -31,6 +31,10 @@ export default function Home() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        // Either skip loading personalized content or show public posts
+        return
+      }  
       setUser(user)
     }
     getUser()
@@ -70,7 +74,7 @@ export default function Home() {
 
 
   useEffect(() => {
-    if (user) loadBuzzes(sortMode)
+    loadBuzzes(sortMode)
   }, [user, sortMode])
 
 

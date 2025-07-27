@@ -39,6 +39,7 @@ export default function MessagesPage() {
 
         if (!latestMap[key] || new Date(msg.created_at) > new Date(latestMap[key].created_at)) {
           latestMap[key] = {
+            id: msg.id,
             otherUser,
             content: msg.content,
             created_at: msg.created_at,
@@ -61,12 +62,12 @@ export default function MessagesPage() {
       <h1 className="text-2xl font-bold mb-6">Messages</h1>
 
       {conversations.length === 0 ? (
-        <p className="text-gray-500">You haven't messaged anyone yet.</p>
+        <p className="text-gray-500">You haven&#39;t messaged anyone yet.</p>
       ) : (
         conversations.map(conv => (
           <Link
             key={conv.otherUser.id}
-            href={`/messages/${conv.otherUser.username}`}
+            href={`/messages/${conv.id}`}
             className="flex items-center gap-4 py-4 border-b border-gray-200 hover:bg-gray-50 transition"
           >
             <img

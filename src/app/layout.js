@@ -99,7 +99,7 @@ export default function RootLayout({ children }) {
                     }}
                     className="block w-full text-left px-4 py-2 hover:bg-gray-100"
                   >
-                    🔍 Search users for "{query || '...'}"
+                    🔍 Search users for &quot;{query || '...'}&quot;
                   </button>
                   <button
                     onClick={() => {
@@ -108,7 +108,7 @@ export default function RootLayout({ children }) {
                     }}
                     className="block w-full text-left px-4 py-2 hover:bg-gray-100"
                   >
-                    🔍 Search posts for "{query || '...'}"
+                    🔍 Search posts for &quot;{query || '...'}&quot;
                   </button>
                 </div>
               )}

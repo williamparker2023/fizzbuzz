@@ -246,7 +246,7 @@ export default function UserProfile() {
         <h2 className="text-xl font-semibold mb-4">Buzzes by {profile.username}</h2>
 
         {buzzes.length === 0 ? (
-          <p className="text-gray-400">This user hasn't posted anything yet.</p>
+          <p className="text-gray-400">This user hasn&rsquo;t posted anything yet.</p>
         ) : (
           buzzes.map(buzz => {
             const isOpen = openBuzzId === buzz.id
