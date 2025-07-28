@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -7,11 +7,20 @@ import { useRouter } from 'next/navigation'
 export default function Home() {
   const [user, setUser] = useState(null)
   const [buzzes, setBuzzes] = useState([])
-  const router = useRouter()
+  const [hasMore, setHasMore] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [sortMode, setSortMode] = useState('trending')
   const [previewUrl, setPreviewUrl] = useState(null)
-  const [sortMode, setSortMode] = useState('trending') 
+  const [openBuzzId, setOpenBuzzId] = useState(null)
+  const router = useRouter()
 
+  const PAGE_SIZE = 20
+  const pageRef = useRef(0)   // This is the current page to load
 
+  // Debounce to avoid rapid scroll triggers
+  const debounceRef = useRef(null)
+
+  // Transform buzz data
   function transformBuzzes(data, user) {
     return data.map(buzz => {
       let likes = buzz.likes
@@ -27,20 +36,21 @@ export default function Home() {
     })
   }
 
-
+  // Load user on mount
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        // Either skip loading personalized content or show public posts
-        return
-      }  
-      setUser(user)
+      setUser(user || null)
     }
     getUser()
   }, [])
 
-  const loadBuzzes = async (mode = 'trending') => {
+  // Main fetcher with reset logic
+  const loadBuzzes = useCallback(async (reset = false) => {
+    if (loading || !hasMore) return
+    setLoading(true)
+    let pageNum = reset ? 0 : pageRef.current
+
     let query = supabase
       .from('buzzes')
       .select(`
@@ -52,43 +62,68 @@ export default function Home() {
           users (username, github_url)
         )
       `)
+      .range(pageNum * PAGE_SIZE, pageNum * PAGE_SIZE + PAGE_SIZE - 1)
 
-    query = mode === 'recent'
+    query = sortMode === 'recent'
       ? query.order('created_at', { ascending: false })
-      : query.order('like_count', { ascending: false })
+      : query.order('like_count', { ascending: false }).order('created_at', { ascending: false })
 
     const { data, error } = await query
-
-    if (!error) {
-      const transformed = transformBuzzes(data, user)
-      setBuzzes(transformed)
-      console.log('Buzzes after reload:', transformed.map(b => ({
-        id: b.id,
-        likeCount: b.likeCount,
-        like_count: b.like_count
-      })))
+    if (error) {
+      setLoading(false)
+      console.error('Buzz load error:', error)
+      return
     }
-  }
 
+    const transformed = transformBuzzes(data, user)
+    setBuzzes(prev =>
+      reset ? transformed : [...prev, ...transformed.filter(b => !prev.some(p => p.id === b.id))]
+    )
 
+    // Set hasMore and pageRef
+    if (!data || data.length < PAGE_SIZE) {
+      setHasMore(false)
+    } else {
+      setHasMore(true)
+      pageRef.current = pageNum + 1
+    }
+    setLoading(false)
+  }, [sortMode, user, loading, hasMore])
 
-
+  // On sortMode or user change, reset all state and load first page
   useEffect(() => {
-    loadBuzzes(sortMode)
-  }, [user, sortMode])
+    setBuzzes([])
+    setHasMore(true)
+    setLoading(false)
+    pageRef.current = 0
+    if (user) loadBuzzes(true)
+    // eslint-disable-next-line
+  }, [sortMode, user])
 
+  // Infinite scroll handler
+  useEffect(() => {
+    const handleScroll = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => {
+        if (loading || !hasMore) return
+        if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 300) {
+          loadBuzzes()
+        }
+      }, 100)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [loading, hasMore, loadBuzzes])
 
-
+  // --- Like/Comment/New Buzz functions (same as before) ---
   const handleLikeToggle = async (buzzId) => {
     if (!user) {
       alert('Log in to like posts.')
       router.push('/login')
       return
     }
-
     const buzz = buzzes.find(b => b.id === buzzId)
     const hasLiked = buzz.likedByUser
-
     let error
 
     if (hasLiked) {
@@ -97,13 +132,11 @@ export default function Home() {
         .delete()
         .eq('buzz_id', buzzId)
         .eq('user_id', user.id)
-
       error = res.error
     } else {
       const res = await supabase
         .from('likes')
         .insert({ buzz_id: buzzId, user_id: user.id })
-
       error = res.error
     }
 
@@ -112,22 +145,14 @@ export default function Home() {
       return
     }
 
-    // ✅ Update the local buzz object to avoid reshuffling
     setBuzzes(prevBuzzes =>
       prevBuzzes.map(b =>
         b.id === buzzId
-          ? {
-              ...b,
-              likedByUser: !hasLiked,
-              likeCount: hasLiked ? b.likeCount - 1 : b.likeCount + 1
-            }
+          ? { ...b, likedByUser: !hasLiked, likeCount: hasLiked ? b.likeCount - 1 : b.likeCount + 1 }
           : b
       )
     )
   }
-
-
-
 
   const handleNewBuzzSubmit = async (e) => {
     e.preventDefault()
@@ -141,9 +166,7 @@ export default function Home() {
 
       const { error: uploadError } = await supabase.storage
         .from('buzz-images')
-        .upload(filePath, file, {
-          contentType: file.type
-        })
+        .upload(filePath, file, { contentType: file.type })
 
       if (uploadError) {
         console.error('Image upload failed:', uploadError)
@@ -172,13 +195,13 @@ export default function Home() {
 
     e.target.reset()
     setPreviewUrl(null)
-
-    loadBuzzes()
+    // Reload first page after posting
+    setBuzzes([])
+    setHasMore(true)
+    setLoading(false)
+    pageRef.current = 0
+    loadBuzzes(true)
   }
-
-
-
-  const [openBuzzId, setOpenBuzzId] = useState(null)
 
   const handleCommentSubmit = async (e, buzzId) => {
     e.preventDefault()
@@ -196,15 +219,12 @@ export default function Home() {
         prev.map(b =>
           b.id === buzzId
             ? {
-                ...b,
-                comments: [
-                  ...(b.comments || []),
-                  {
-                    ...data,
-                    users: { username: user.user_metadata.user_name }
-                  }
-                ]
-              }
+              ...b,
+              comments: [
+                ...(b.comments || []),
+                { ...data, users: { username: user.user_metadata.user_name } }
+              ]
+            }
             : b
         )
       )
@@ -212,12 +232,10 @@ export default function Home() {
     }
   }
 
-
+  // -- The rest of your render logic below here remains the same --
 
   return (
     <div className="flex min-h-screen justify-center">
-      {/* Main Content */}
-
       <main className="w-full max-w-2xl px-4">
         {/* New Buzz Form at the top */}
         {user && (
@@ -228,7 +246,7 @@ export default function Home() {
             <textarea
               name="newBuzz"
               placeholder="What's buzzing?"
-              className="w-full p-3 rounded bg-white text-black  resize-none focus:outline-none focus:ring-2 focus:ring-darkaccent"
+              className="w-full p-3 rounded bg-white text-black resize-none focus:outline-none focus:ring-2 focus:ring-darkaccent"
               rows={3}
             />
             {previewUrl && (
@@ -251,7 +269,6 @@ export default function Home() {
 
             <div className="flex justify-end gap-4 mt-4">
               {/* Image Upload Button */}
-
               <input
                 type="file"
                 id="imageUpload"
@@ -260,13 +277,10 @@ export default function Home() {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files[0]
-                  if (file) {
-                    setPreviewUrl(URL.createObjectURL(file))
-                  } else {
-                    setPreviewUrl(null)
-                  }
+                  if (file) setPreviewUrl(URL.createObjectURL(file))
+                  else setPreviewUrl(null)
                 }}
-                />
+              />
               <label
                 htmlFor="imageUpload"
                 className="cursor-pointer text-2xl hover:scale-110 transition flex items-center"
@@ -274,9 +288,6 @@ export default function Home() {
               >
                 📷
               </label>
-
-
-              {/* Buzz Submit Button */}
               <button
                 type="submit"
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
@@ -284,12 +295,10 @@ export default function Home() {
                 Buzz
               </button>
             </div>
-
           </form>
         )}
 
         <div className="flex mt-4 border-b border-gray-300 pb-2">
-          {/* Left Half - Trending */}
           <div className="w-1/2 flex justify-center">
             <button
               onClick={() => setSortMode('trending')}
@@ -302,8 +311,6 @@ export default function Home() {
               Trending
             </button>
           </div>
-
-          {/* Right Half - Recent */}
           <div className="w-1/2 flex justify-center">
             <button
               onClick={() => setSortMode('recent')}
@@ -318,24 +325,9 @@ export default function Home() {
           </div>
         </div>
 
-
-
-        {/* Feed Header */}
-        {/* <div className="flex justify-between items-center mb-6 animate-fadeIn">
-          <h1 className="text-3xl font-bold text-black">Fizzbuzz Feed</h1>
-          {user && (
-            <Link href="/new-buzz">
-              <button className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                New Buzz
-              </button>
-            </Link>
-          )}
-        </div> */}
-
         {/* Buzzes */}
         {buzzes.map(buzz => {
           const isOpen = openBuzzId === buzz.id
-
           return (
             <div key={buzz.id} className="px-4 py-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
@@ -352,8 +344,6 @@ export default function Home() {
               </div>
 
               <p className="text-base text-black break-words whitespace-pre-wrap">{buzz.content}</p>
-
-
               {buzz.image_url && (
                 <img
                   src={buzz.image_url}
@@ -361,9 +351,6 @@ export default function Home() {
                   className="w-full max-h-150 object-contain mt-4 rounded border border-gray-300"
                 />
               )}
-
-
-
               {buzz.tags?.length > 0 && (
                 <div className="flex gap-2 flex-wrap">
                   {buzz.tags.map((tag, i) => (
@@ -371,7 +358,6 @@ export default function Home() {
                   ))}
                 </div>
               )}
-
               <div className="flex gap-6 items-center text-sm text-gray-500 mt-2">
                 <button onClick={() => handleLikeToggle(buzz.id)} className="hover:scale-110 transition">
                   {buzz.likedByUser ? '❤️' : '🤍'} {buzz.likeCount}
@@ -381,7 +367,6 @@ export default function Home() {
                 </button>
                 <span className="text-xs">{new Date(buzz.created_at).toLocaleString()}</span>
               </div>
-
               {isOpen && (
                 <div className="pt-4 space-y-4 animate-fade-in">
                   {user && (
@@ -389,13 +374,12 @@ export default function Home() {
                       onSubmit={e => handleCommentSubmit(e, buzz.id)}
                       className="flex gap-2"
                     >
-                    <input
-                      name="comment"
-                      placeholder="Reply..."
-                      className="flex-1 p-2 text-sm border border-gray-300 rounded text-black"
-                    />
-                    <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">Send</button>
-
+                      <input
+                        name="comment"
+                        placeholder="Reply..."
+                        className="flex-1 p-2 text-sm border border-gray-300 rounded text-black"
+                      />
+                      <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">Send</button>
                     </form>
                   )}
                   {buzz.comments.map(comment => (
@@ -411,15 +395,18 @@ export default function Home() {
                       <div className="ml-1">💬 {comment.content}</div>
                     </div>
                   ))}
-
-
                 </div>
               )}
             </div>
           )
         })}
-
-
+        {/* Loader at the bottom */}
+        {loading && (
+          <div className="flex justify-center py-8 text-blue-500">Loading...</div>
+        )}
+        {!hasMore && buzzes.length > 0 && (
+          <div className="flex justify-center py-8 text-gray-400">No more buzzes to load.</div>
+        )}
       </main>
     </div>
   )

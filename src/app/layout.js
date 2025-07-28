@@ -179,11 +179,12 @@ export default function RootLayout({ children }) {
         </aside>
 
         {/* Main Feed (visually centered regardless of sidebar) */}
-        <main className="relative min-h-screen">
-          <div className="absolute left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4 pt-8">
+        <main className="flex justify-center min-h-screen pt-8">
+          <div className="w-full max-w-2xl px-4">
             {children}
           </div>
         </main>
+
 
       </body>
     </html>
