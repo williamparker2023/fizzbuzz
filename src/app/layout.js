@@ -166,7 +166,7 @@ export default function RootLayout({ children }) {
                     provider: 'github',
                     options: {
                       queryParams: { prompt: 'login' },
-                      redirectTo: 'http://localhost:3000/callback'
+                      redirectTo: 'https://fizzbuzz-social.vercel.app/callback'
                     }
                   })
                 }}

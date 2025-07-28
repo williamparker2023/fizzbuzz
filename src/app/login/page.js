@@ -9,7 +9,7 @@ export default function Login() {
         queryParams: {
         prompt: 'login'  // <--- this forces GitHub to show the account picker
         },
-        redirectTo: 'http://localhost:3000/callback'
+        redirectTo: 'https://fizzbuzz-social.vercel.app/callback'
     }
     })
   }
