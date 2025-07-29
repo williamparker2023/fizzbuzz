@@ -96,7 +96,7 @@ export default function Home() {
     setHasMore(true)
     setLoading(false)
     pageRef.current = 0
-    if (user) loadBuzzes(true)
+    loadBuzzes(true)
     // eslint-disable-next-line
   }, [sortMode, user])
 
