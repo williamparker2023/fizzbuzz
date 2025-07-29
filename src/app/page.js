@@ -106,7 +106,7 @@ export default function Home() {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => {
         if (loading || !hasMore) return
-        if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 1200) {
+        if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 1600) {
           loadBuzzes()
         }
       }, 100)
