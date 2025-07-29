@@ -16,8 +16,6 @@ export default function Home() {
 
   const PAGE_SIZE = 20
   const pageRef = useRef(0)   // This is the current page to load
-
-  // Debounce to avoid rapid scroll triggers
   const debounceRef = useRef(null)
 
   // Transform buzz data
@@ -27,7 +25,6 @@ export default function Home() {
       if (!Array.isArray(likes)) {
         likes = likes && typeof likes === 'object' ? [likes] : []
       }
-
       return {
         ...buzz,
         likeCount: Number(buzz.like_count) || 0,
@@ -47,7 +44,8 @@ export default function Home() {
 
   // Main fetcher with reset logic
   const loadBuzzes = useCallback(async (reset = false) => {
-    if (loading || !hasMore) return
+    // Always allow first load on reset; only block if not reset and loading/hasMore prevents it
+    if (!reset && (loading || !hasMore)) return
     setLoading(true)
     let pageNum = reset ? 0 : pageRef.current
 
@@ -80,7 +78,6 @@ export default function Home() {
       reset ? transformed : [...prev, ...transformed.filter(b => !prev.some(p => p.id === b.id))]
     )
 
-    // Set hasMore and pageRef
     if (!data || data.length < PAGE_SIZE) {
       setHasMore(false)
     } else {
@@ -88,7 +85,7 @@ export default function Home() {
       pageRef.current = pageNum + 1
     }
     setLoading(false)
-  }, [sortMode, user, loading, hasMore])
+  }, [sortMode, user])
 
   // On sortMode or user change, reset all state and load first page
   useEffect(() => {
@@ -106,7 +103,7 @@ export default function Home() {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => {
         if (loading || !hasMore) return
-        if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2400) {
+        if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 800) {
           loadBuzzes()
         }
       }, 100)
@@ -115,7 +112,7 @@ export default function Home() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [loading, hasMore, loadBuzzes])
 
-  // --- Like/Comment/New Buzz functions (same as before) ---
+  // Like/Comment/New Buzz functions
   const handleLikeToggle = async (buzzId) => {
     if (!user) {
       alert('Log in to like posts.')
@@ -232,8 +229,7 @@ export default function Home() {
     }
   }
 
-  // -- The rest of your render logic below here remains the same --
-
+  // --- Render ---
   return (
     <div className="flex min-h-screen justify-center">
       <main className="w-full max-w-2xl px-4">
@@ -266,9 +262,7 @@ export default function Home() {
                 </button>
               </div>
             )}
-
             <div className="flex justify-end gap-4 mt-4">
-              {/* Image Upload Button */}
               <input
                 type="file"
                 id="imageUpload"
