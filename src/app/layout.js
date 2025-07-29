@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { Analytics } from "@vercel/analytics/next"
 
 export default function RootLayout({ children }) {
   const [user, setUser] = useState(null)
@@ -182,6 +183,7 @@ export default function RootLayout({ children }) {
         <main className="flex justify-center min-h-screen pt-8">
           <div className="w-full max-w-2xl px-4">
             {children}
+            <Analytics />
           </div>
         </main>
 
