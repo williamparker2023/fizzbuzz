@@ -32,41 +32,44 @@ export default function NewMessageRedirect() {
 
       const [id1, id2] = [currentUser.id, targetUser.id].sort()
 
-      const { data: existing, error: existingError } = await supabase
-        .from('messages')
-        .select('id')
-        .or(
-          `and(sender_id.eq.${id1},receiver_id.eq.${id2}),and(sender_id.eq.${id2},receiver_id.eq.${id1})`
-        )
-        .limit(1)
-        .single()
+  const { data: existing, error: existingError } = await supabase
+    .from('messages')
+    .select('id')
+    .or(
+      `and(sender_id.eq.${id1},receiver_id.eq.${id2}),and(sender_id.eq.${id2},receiver_id.eq.${id1})`
+    )
+    .limit(1)
+    .single()
 
+  // Only treat as an error if it's *not* the "no rows found" error
+  if (existingError && existingError.code !== 'PGRST116') {
+    alert('Error checking for existing message');
+    console.error('Error checking for existing message:', existingError);
+    return;
+  }
 
-      if (existingError) {
-        console.error('Error checking for existing message:', existingError)
-        return
-      }
+  if (existing) {
+    router.push(`/messages/${existing.id}`)
+  } else {
+    // Create a new conversation
+    const { data: newConv, error } = await supabase
+      .from('messages')
+      .insert({
+        sender_id: currentUser.id,
+        receiver_id: targetUser.id,
+        content: 'Conversation started'
+      })
+      .select('id')
+      .single()
 
-      if (existing) {
-        router.push(`/messages/${existing.id}`)
-      } else {
-        const { data: newConv, error } = await supabase
-          .from('messages')
-          .insert({
-            sender_id: currentUser.id,
-            receiver_id: targetUser.id,
-            content: 'Conversation started'
-          })
-          .select('id')
-          .single()
+    if (error) {
+      alert('Error creating message')
+      console.error(error)
+    } else {
+      router.push(`/messages/${newConv.id}`)
+    }
+  }
 
-        if (error) {
-          alert('Error creating message')
-          console.error(error)
-        } else {
-          router.push(`/messages/${newConv.id}`)
-        }
-      }
     }
 
     createOrRedirect()
